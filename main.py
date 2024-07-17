@@ -1,9 +1,3 @@
-"""
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved
-
-Author: Dejiao Zhang (dejiaoz@amazon.com)
-Date: 02/26/2021
-"""
 
 import os
 import sys
@@ -59,7 +53,7 @@ def get_args(argv):
     parser.add_argument('--use_pretrain', type=str, default='SBERT', choices=["BERT", "SBERT", "PAIRSUPCON", "VASCL", "VASCLL"])
     
     # Dataset
-    parser.add_argument('--datapath', type=str, default='/home/zhang/GLA-master/AugData')
+    parser.add_argument('--datapath', type=str, default='~/autodl-tmp/GLA-master/AugData')
     parser.add_argument('--dataname', type=str, default='search_snippets_charswap_20', help="")
     parser.add_argument('--num_classes', type=int, default=8, help="")
     parser.add_argument('--max_length', type=int, default=32)

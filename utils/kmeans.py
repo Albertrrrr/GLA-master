@@ -1,9 +1,4 @@
-"""
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved
 
-Author: Dejiao Zhang (dejiaoz@amazon.com)
-Date: 02/26/2021
-"""
 
 import torch
 import numpy as np

@@ -8,7 +8,7 @@ Date: 02/26/2021
 import os
 import torch 
 from transformers import get_linear_schedule_with_warmup
-from transformers import AutoModel, AutoTokenizer, AutoConfig
+from transformers import AutoModel, AutoTokenizer, AutoConfig, RobertaModel
 from sentence_transformers import SentenceTransformer
 from transformers import RobertaConfig
 
@@ -50,7 +50,7 @@ def get_bert(args):
     elif args.use_pretrain == "VASCL":
         tokenizer = AutoTokenizer.from_pretrained(VASCL_CLASS[args.bert])
         config = RobertaConfig.from_pretrained(VASCL_CLASS[args.bert])
-        model = AutoModel.from_pretrained(VASCL_CLASS[args.bert], config=config)
+        model = RobertaModel.from_pretrained(VASCL_CLASS[args.bert], config=config)
         if args.bert == "vascl":
             print("..... loading VASCL-Roberta-base !!!")
         else:

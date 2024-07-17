@@ -1,9 +1,3 @@
-"""
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved
-
-Author: Dejiao Zhang (dejiaoz@amazon.com)
-Date: 12/12/2021
-"""
 
 
 from __future__ import print_function
