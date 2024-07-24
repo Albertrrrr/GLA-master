@@ -29,7 +29,7 @@ def run(args):
     # initialize cluster centers
     cluster_centers = get_kmeans_centers(bert, tokenizer, train_loader, args.num_classes, args.max_length)
     
-    model = SCCLBert(bert, tokenizer, cluster_centers=cluster_centers, alpha=args.alpha) 
+    model = SCCLBert(bert, tokenizer, cluster_centers=cluster_centers, alpha=args.alpha, num_clusters=args.num_classes)
     model = model.cuda()
 
     # optimizer 

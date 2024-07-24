@@ -1,5 +1,3 @@
-
-
 import os
 import time
 import numpy as np
@@ -14,6 +12,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from learner.cluster_utils import target_distribution
 from learner.contrastive_utils import PairConLoss
+from learner.cluster_contrastive_utils import cluster_contrastive_loss
 import umap.umap_ as umap
 
 
@@ -30,8 +29,9 @@ class SCCLvTrainer(nn.Module):
         self.best_score = None
         self.cluster_loss = nn.KLDivLoss(size_average=False)
         self.contrast_loss = PairConLoss(temperature=self.args.temperature)
-
+        self.bestStep = None
         self.gstep = 0
+        self.bestStepSwitch = False
         print(f"*****Intialize SCCLv, temp:{self.args.temperature}, eta:{self.args.eta}\n")
 
     def get_batch_token(self, text):
@@ -83,8 +83,15 @@ class SCCLvTrainer(nn.Module):
             target = target_distribution(output).detach()
 
             cluster_loss = self.cluster_loss((output + 1e-08).log(), target) / output.shape[0]
-            loss += 0.5 * cluster_loss
+            loss += 8 * cluster_loss
             losses["cluster_loss"] = cluster_loss.item()
+
+            # L_clu
+            cluster_probs_1 = self.model.get_cluster_prob_for_lclu(embd1)
+            cluster_probs_2 = self.model.get_cluster_prob_for_lclu(embd2)
+            clu_loss = cluster_contrastive_loss(cluster_probs_1, cluster_probs_2, self.args.temperature)
+            loss += 4 * clu_loss
+            losses["clu_loss"] = clu_loss.item()
 
         loss.backward()
         self.optimizer.step()
@@ -106,14 +113,20 @@ class SCCLvTrainer(nn.Module):
             target = target_distribution(output).detach()
 
             cluster_loss = self.cluster_loss((output + 1e-08).log(), target) / output.shape[0]
-            loss += cluster_loss
+            loss += 0.5 * cluster_loss
             losses["cluster_loss"] = cluster_loss.item()
+
+            proj1 = self.model.cluster_projection(embd1)
+            proj2 = self.model.cluster_projection(embd2)
+            proj3 = self.model.cluster_projection(embd3)
+            cluster_cl_losses = self.model.cluster_contrastive_loss(proj1, proj2, proj3)
+            loss += cluster_cl_losses
+            losses["cluster_cl_loss"] = cluster_cl_losses.item()
 
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
         return losses
-
 
     def train(self):
         print('\n={}/{}=Iterations/Batches'.format(self.args.max_iter, len(self.train_loader)))
@@ -137,17 +150,19 @@ class SCCLvTrainer(nn.Module):
                 self.evaluate_embedding(i)
                 self.model.train()
 
-        print('---- END Saving Best Model ACC: {}   ----'.format(self.best_acc))
+                if self.bestStepSwitch:
+                    self.bestStep = i
+                    self.bestStepSwitch = False
+
+        print('---- END Saving Best Model At the: {} Step  ----'.format(self.bestStep))
+        print('---- END Saving Best Model ACC: {:.3f}   ----'.format(self.best_acc))
         print('---- END Saving Best Model Clustering scores:: {}   ----'.format(self.best_score))
 
         return None
 
     def evaluate_embedding(self, step):
         dataloader = unshuffle_loader(self.args)
-        if self.args.rd == 'umap':
-            print('---- {} evaluation batches with UMAP ----'.format(len(dataloader)))
-        else:
-            print('---- {} evaluation batches ----'.format(len(dataloader)))
+        
 
         self.model.eval()
         for i, batch in enumerate(dataloader):
@@ -180,7 +195,8 @@ class SCCLvTrainer(nn.Module):
         # Then we can use UMAP to reduce the dimension
         # waiting for code
         if self.args.rd == 'umap':
-            reducer = umap.UMAP(n_neighbors=15, n_components=2, metric='euclidean')
+            reducer = umap.UMAP(n_neighbors=15, n_components=2, metric='euclidean', low_memory=False, n_jobs=-1,
+                                force_approximation_algorithm=True)
             umap_embeddings = reducer.fit_transform(embeddings)
             kmeans.fit(umap_embeddings)
         else:
@@ -193,8 +209,6 @@ class SCCLvTrainer(nn.Module):
         confusion.optimal_assignment(self.args.num_classes)
         acc = confusion.acc()
 
-
-
         ressave = {"acc": acc, "acc_model": acc_model}
         ressave.update(confusion.clusterscores())
         for key, val in ressave.items():
@@ -204,8 +218,8 @@ class SCCLvTrainer(nn.Module):
         np.save(self.args.resPath + 'scores_{}.npy'.format(step), confusion.clusterscores())
         np.save(self.args.resPath + 'mscores_{}.npy'.format(step), confusion_model.clusterscores())
         # np.save(self.args.resPath + 'mpredlabels_{}.npy'.format(step), all_pred.cpu().numpy())
-        # np.save(self.args.resPath + 'predlabels_{}.npy'.format(step), pred_labels.cpu().numpy())
-        # np.save(self.args.resPath + 'embeddings_{}.npy'.format(step), embeddings)
+        np.save(self.args.resPath + 'predlabels_{}.npy'.format(step), pred_labels.cpu().numpy())
+        np.save(self.args.resPath + 'embeddings_{}.npy'.format(step), embeddings)
         # np.save(self.args.resPath + 'labels_{}.npy'.format(step), all_labels.cpu())
 
         # save model
@@ -214,6 +228,7 @@ class SCCLvTrainer(nn.Module):
             best_model_path = os.path.join(self.args.resPath, 'best_model.pth')
             torch.save(self.model, best_model_path)
             self.best_score = confusion_model.clusterscores()
+            self.bestStepSwitch = True
             print('[Model] Saving ACC: {:.3f}'.format(acc_model))
 
         print('[Representation] Clustering scores:', confusion.clusterscores())
