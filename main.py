@@ -53,7 +53,7 @@ def get_args(argv):
     parser.add_argument('--use_pretrain', type=str, default='SBERT', choices=["BERT", "SBERT", "PAIRSUPCON", "VASCL", "VASCLL"])
     
     # Dataset
-    parser.add_argument('--datapath', type=str, default='~/autodl-tmp/GLA-master/AugData')
+    parser.add_argument('--datapath', type=str, default='./AugData')
     parser.add_argument('--dataname', type=str, default='search_snippets_charswap_20', help="")
     parser.add_argument('--num_classes', type=int, default=8, help="")
     parser.add_argument('--max_length', type=int, default=32)
@@ -76,6 +76,10 @@ def get_args(argv):
     # Clustering
     parser.add_argument('--alpha', type=float, default=1.0)
     parser.add_argument('--rd', type=str, default='', choices=['', 'umap'])
+    parser.add_argument('--ab', type=str, default=' ')
+
+
+
 
     
     args = parser.parse_args(argv)

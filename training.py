@@ -83,15 +83,16 @@ class SCCLvTrainer(nn.Module):
             target = target_distribution(output).detach()
 
             cluster_loss = self.cluster_loss((output + 1e-08).log(), target) / output.shape[0]
-            loss += 8 * cluster_loss
+            loss += 0.5 * cluster_loss
             losses["cluster_loss"] = cluster_loss.item()
 
             # L_clu
-            cluster_probs_1 = self.model.get_cluster_prob_for_lclu(embd1)
-            cluster_probs_2 = self.model.get_cluster_prob_for_lclu(embd2)
-            clu_loss = cluster_contrastive_loss(cluster_probs_1, cluster_probs_2, self.args.temperature)
-            loss += 4 * clu_loss
-            losses["clu_loss"] = clu_loss.item()
+            if self.args.ab != 'ab':
+                cluster_probs_1 = self.model.get_cluster_prob_for_lclu(embd1)
+                cluster_probs_2 = self.model.get_cluster_prob_for_lclu(embd2)
+                clu_loss = cluster_contrastive_loss(cluster_probs_1, cluster_probs_2, self.args.temperature)
+                loss += 1 * clu_loss
+                losses["clu_loss"] = clu_loss.item()
 
         loss.backward()
         self.optimizer.step()
@@ -113,15 +114,8 @@ class SCCLvTrainer(nn.Module):
             target = target_distribution(output).detach()
 
             cluster_loss = self.cluster_loss((output + 1e-08).log(), target) / output.shape[0]
-            loss += 0.5 * cluster_loss
+            loss += cluster_loss
             losses["cluster_loss"] = cluster_loss.item()
-
-            proj1 = self.model.cluster_projection(embd1)
-            proj2 = self.model.cluster_projection(embd2)
-            proj3 = self.model.cluster_projection(embd3)
-            cluster_cl_losses = self.model.cluster_contrastive_loss(proj1, proj2, proj3)
-            loss += cluster_cl_losses
-            losses["cluster_cl_loss"] = cluster_cl_losses.item()
 
         loss.backward()
         self.optimizer.step()
@@ -130,7 +124,10 @@ class SCCLvTrainer(nn.Module):
 
     def train(self):
         print('\n={}/{}=Iterations/Batches'.format(self.args.max_iter, len(self.train_loader)))
-
+        if self.args.ab == "":
+            print(".... Test Model ....")
+        elif self.args.ab == "ab":
+            print(".... Ablation Test Model ....")
         self.model.train()
         for i in np.arange(self.args.max_iter + 1):
             try:
@@ -219,14 +216,14 @@ class SCCLvTrainer(nn.Module):
         np.save(self.args.resPath + 'mscores_{}.npy'.format(step), confusion_model.clusterscores())
         # np.save(self.args.resPath + 'mpredlabels_{}.npy'.format(step), all_pred.cpu().numpy())
         np.save(self.args.resPath + 'predlabels_{}.npy'.format(step), pred_labels.cpu().numpy())
-        np.save(self.args.resPath + 'embeddings_{}.npy'.format(step), embeddings)
+        # np.save(self.args.resPath + 'embeddings_{}.npy'.format(step), embeddings)
         # np.save(self.args.resPath + 'labels_{}.npy'.format(step), all_labels.cpu())
 
         # save model
         if acc_model > self.best_acc:
             self.best_acc = acc_model
-            best_model_path = os.path.join(self.args.resPath, 'best_model.pth')
-            torch.save(self.model, best_model_path)
+            # best_model_path = os.path.join(self.args.resPath, 'best_model.pth')
+            # torch.save(self.model, best_model_path)
             self.best_score = confusion_model.clusterscores()
             self.bestStepSwitch = True
             print('[Model] Saving ACC: {:.3f}'.format(acc_model))
